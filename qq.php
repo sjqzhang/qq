@@ -1,6 +1,7 @@
 #!/usr/bin/php
 <?php
 require_once(dirname(__FILE__).'/common.inc.php');
+require_once(dirname(__FILE__).'/phpQuery.php');
 //$db=new DB('127.0.0.1','root','root','stock');
 $db=new DB('172.16.132.230','root','root','stock');
 
@@ -154,8 +155,8 @@ class QQ3G {
                 continue;
             }
 
-            if(strlen($msg)>512) {
-                foreach(str_split($msg,512) as $mm){
+            if(strlen($msg)>1024) {
+                foreach(str_split($msg,1024) as $mm){
                     $data = array(
                         'u'         => $qq,
                         'saveUrl'   => 0,
@@ -652,13 +653,44 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
 
     }
 
-    function __call($op,$args){
+    function hot(){
+        phpQuery::newDocumentFileHTML("http://xueqiu.com/");
+        $data=array();
+        foreach(pq('.hot_rank:eq(0) .ti_addition a') as $item){
+            $name= pq($item)->attr('title');
+            if(preg_match('/\d{6}/', pq($item)->attr('href'),$match)){
+                $code=$match[0];
+            } else {
+                $code='';
+            }
 
-        if(method_exists($this,$op)){
-            return $this->$op($args[0]);
-    } else {
-        return "小Q暂时无法处理";
+            if(!empty($code)){
+                array_push($data,array('name'=>$name,'code'=>$code));
+            }
+        }
+        return $this->msgformat($data);
     }
+
+
+    function dispatch($num,$message,$sender){
+        $func='gg';
+        $stockno='';
+        $flag=false;
+        if(preg_match('/^[a-z]+/',$message,$match)){
+            $func=$match[0];
+            $flag=true;
+        }
+        if(preg_match('/[0-9 ]+$/',$message,$match)){
+            $stockno=trim($match[0]);
+        } else {
+           $stockno= str_replace($func,'',$message);
+           $stockno=trim($stockno);
+        }
+        if(method_exists($this,$func)){
+            $sender->send($num,$this->$func($stockno));
+        } else {
+            $sender->send($num,'无法识别指令');
+        }
 
     }
 
@@ -683,49 +715,58 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
                 array_push($qq->md5,$num);
             }
             $txt=$msg['message'];
-            $txts=preg_split('/\s+/', $msg['message']);
-            $act=$txts[0];
-            $cmd=isset($txts[1])?$txts[1]:$txts[0];
-            if( preg_match('/^\d{6}$/', $msg['message'],$match)){
-                $qq->send($num, $gp->gg($txt) );
-            } else if( preg_match('/^28\d{6}$/', $msg['message'],$match)){
-                $qq->send($num, $gp->bk($txt) );
 
-            } else if(preg_match('/^[a-z 0-9]*$/',$txt)&&strlen($txt)<20) {
+            try {
+                $gp->dispatch($num,$txt,$qq);
+            }catch(Exception $e){
 
-                try{
-                    $cmds=array();
-                    if(preg_match('/\s+/',$txt)){
-                        $cmds= preg_split('/\s+/',$txt);
-                    } else if(preg_match('/([a-z]+)([0-9]+)/',$txt,$match)){
-                        $cmds[0]=$match[1];
-                        $cmds[1]=$match[2];
-                    } else {
-                        preg_match('/[a-z0-9]+/',$txt,$cmds);
-                    }
-                    if(count($cmds)==2){
-                        $qq->send($num, $gp->$cmds[0]($cmds[1]));
-                    } else if(!is_numeric($cmds[0])){
-                        echo $cmds[0];
-                        $qq->send($num, $gp->$cmds[0](0));
-                    } else {
-                        $qq->send($num,"无法识别指令");
-                    }
-                }catch(Exception $e){
-                    $qq->send($num,"无法识别指令");
-                }
-
-            }  else if( preg_match('/^cmd(.*)/', $msg['message'],$match)){
-
-                $qq->send($num,$gp->cmd($match[1]));
-
-            } else if( preg_match('/^sql(.*)/', $msg['message'],$match)){
-                $qq->send($num,$gp->sql($match[1]));
-
-            }   else if(preg_match('/^[\x80-\xff]*^/',$txt)&&strlen($txt)<=12){
-                $qq->send($num,$gp->gg($txt));
+                $qq->send($num,$e);
 
             }
+            //$txts=preg_split('/\s+/', $msg['message']);
+            //$act=$txts[0];
+            //$cmd=isset($txts[1])?$txts[1]:$txts[0];
+            //if( preg_match('/^\d{6}$/', $msg['message'],$match)){
+            //    $qq->send($num, $gp->gg($txt) );
+            //} else if( preg_match('/^28\d{6}$/', $msg['message'],$match)){
+            //    $qq->send($num, $gp->bk($txt) );
+
+            //} else if(preg_match('/^[a-z 0-9]*$/',$txt)&&strlen($txt)<20) {
+
+            //    try{
+            //        $cmds=array();
+            //        if(preg_match('/\s+/',$txt)){
+            //            $cmds= preg_split('/\s+/',$txt);
+            //        } else if(preg_match('/([a-z]+)([0-9]+)/',$txt,$match)){
+            //            $cmds[0]=$match[1];
+            //            $cmds[1]=$match[2];
+            //        } else {
+            //            preg_match('/[a-z0-9]+/',$txt,$cmds);
+            //        }
+            //        if(count($cmds)==2){
+            //            $qq->send($num, $gp->$cmds[0]($cmds[1]));
+            //        } else if(!is_numeric($cmds[0])){
+            //            echo $cmds[0];
+            //            $qq->send($num, $gp->$cmds[0](0));
+            //        } else {
+            //            $qq->send($num,"无法识别指令");
+            //        }
+            //    }catch(Exception $e){
+            //        $qq->send($num,"无法识别指令");
+            //    }
+
+            //}  else if( preg_match('/^cmd(.*)/', $msg['message'],$match)){
+
+            //    $qq->send($num,$gp->cmd($match[1]));
+
+            //} else if( preg_match('/^sql(.*)/', $msg['message'],$match)){
+            //    $qq->send($num,$gp->sql($match[1]));
+
+            //}   else if(preg_match('/^[\x80-\xff]*^/',$txt)&&strlen($txt)<=12){
+            //    $qq->send($num,$gp->gg($txt));
+
+            //}
+
 
 
         }
