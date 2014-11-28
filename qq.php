@@ -88,6 +88,7 @@ class QQ3G {
         $file = curl_exec($ch);
         curl_close($ch);
         //echo $file;
+        //$this->write($file);
         return $file;
 
     }
@@ -622,6 +623,31 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
         return $this->query($sql);
     }
 
+
+    function his(){
+
+        $sql="
+
+            SELECT * FROM (
+
+                SELECT * FROM (
+
+                    SELECT  gpxx.stockno,gpxx.name, gpxx.cur, T1.mincls,gpxx.ltsj, ROUND( (gpxx.cur-T1.mincls)/mincls,2) rd FROM stock.gpxx INNER JOIN (
+
+                        SELECT stockno, MIN(cls) mincls  FROM stock_his.his WHERE cycle=0
+                        AND cdate>DATE_ADD(NOW(),INTERVAL -180 DAY)
+                        GROUP BY stockno
+
+                    ) T1 ON gpxx.stockno=T1.stockno AND gpxx.cdate=DATE(NOW()) AND cur>0
+
+                ) T2 WHERE T2.cur<8.5 AND ltsj<100 ORDER BY rd LIMIT 15
+
+            ) T3 ORDER BY rd DESC";
+
+        return $this->query($sql);
+
+    }
+
     function sql($sql){
 
         return $this->query($sql);
@@ -650,6 +676,25 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
         // $shell->writeShell("exit");
         // return $result;
 
+
+    }
+
+
+    function news(){
+        $rows=array();
+        $url="http://new.sousuo.gov.cn/list.htm?q=&n=25&p=0&t=paper&sort=pubtime&childtype=&subchildtype=&pcodeJiguan=&pcodeYear=&pcodeNum=&location=&searchfield=&title=&content=&pcode=&puborg=&timetype=timeqb&mintime=&maxtime=";
+        phpQuery::newDocumentFileHTML($url);
+        foreach(  pq('.info') as $info){
+            $td= pq('td', pq($info)->parent());
+            $href= pq('a',$info)->attr('href');
+            //$href=preg_replace('/http:\/\//','',$href);
+            $text= pq('a',$info)->text();
+            $cdate= $td->eq(3)->text();//preg_replace('/年|月|日/','-',$td->eq(3)->text());
+            $udate= $td->eq(4)->text();// preg_replace('/年|月|日/','-',$td->eq(4)->text());
+            $row=array('标题'=>$text,'创建'=>$cdate,'发布'=>$udate);
+            array_unshift($rows,$row);
+        }
+        return $this->msgformat($rows);
 
     }
 
@@ -686,6 +731,7 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
            $stockno= str_replace($func,'',$message);
            $stockno=trim($stockno);
         }
+
         if(method_exists($this,$func)){
             $sender->send($num,$this->$func($stockno));
         } else {
