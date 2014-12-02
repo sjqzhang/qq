@@ -716,6 +716,24 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
         return $this->msgformat($data);
     }
 
+    function i($stockno){
+
+
+
+        phpQuery::newDocumentFileHTML("http://stockpage.10jqka.com.cn/".$stockno."/company/");
+
+        $text=pq('.product_name')->text();
+        $text=$text."\n\n持股\t".pq('.gray')->parent()->text();
+        $text= preg_replace('/\s+/'," ",$text);
+        $text= preg_replace('/\n+/',"\n",$text);
+        $data=array('info'=>$text);
+
+        return $text;
+
+
+
+    }
+
 
     function dispatch($num,$message,$sender){
         $func='gg';
@@ -727,6 +745,9 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
         }
         if(preg_match('/[0-9 ]+$/',$message,$match)){
             $stockno=trim($match[0]);
+            if(strlen($stockno)==8){
+                $func='bk';
+            }
         } else {
            $stockno= str_replace($func,'',$message);
            $stockno=trim($stockno);

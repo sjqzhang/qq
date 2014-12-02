@@ -410,6 +410,9 @@ class DB
               if(preg_match('/gone away/i',$this->error())||!is_resource($this->con)){
                 $this->close();
                 $this->connect();
+                if(is_resource($this->con)&&$this->db_type=='mysql'){
+                    $this->query("set names {$this->charset}");
+                }
               }
 			}
         }
