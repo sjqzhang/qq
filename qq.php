@@ -491,13 +491,25 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
     }
 
 
-    function gz(){
+    function gz($d){
+/*
 
         $sql="select * from (SELECT ggzl.stockno,ggzl.name,ggzl.price,ggzl.rd1,ggzl.rd5,ggzl.rd10,mr1,ROUND( main_money/10000) main_money,ROUND( super_money/10000) super_money,ROUND( small_money/10000) small_money,ROUND(gpxx.ltsj) ltsj,ROUND(gpxx.zsj) zsj FROM stock.ggzl INNER JOIN stock.ggzj ON
             ggzl.stockno = ggzj.stockno AND ggzl.cdate=ggzj.cdate AND ggzl.cdate=DATE(NOW())
             INNER JOIN stock.gpxx ON gpxx.stockno=ggzl.stockno AND gpxx.cdate=ggzl.cdate
             WHERE (ltsj<80 OR ggzl.price<8) AND super_money>small_money AND small_money<0 ORDER BY super_money DESC LIMIT 10) t order by super_money
             ";
+ */
+
+        if(empty($d)){
+            $d=0;
+        }
+        $sql="select * from (SELECT ggzl.stockno,ggzl.name,ggzl.price,ggzl.rd1,ggzl.rd5,ggzl.rd10,mr1,ROUND( sum( main_money)/10000) main_money,ROUND(sum( super_money)/10000) super_money,ROUND(sum( small_money)/10000) small_money,ROUND(gpxx.ltsj) ltsj,ROUND(gpxx.zsj) zsj FROM stock.ggzl INNER JOIN stock.ggzj ON
+            ggzl.stockno = ggzj.stockno AND ggzl.cdate=ggzj.cdate AND ggzl.cdate>=DATE(date_add(now(),interval -$d day))
+            INNER JOIN stock.gpxx ON gpxx.stockno=ggzl.stockno AND gpxx.cdate=ggzl.cdate
+            WHERE super_money>small_money AND small_money<0 group by ggzj.stockno ORDER BY super_money  DESC LIMIT 10) t order by super_money
+            ";
+
         return $this->query($sql);
     }
 
@@ -792,7 +804,7 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
 
             WHERE gpxx.cdate=DATE(NOW())
 
-            AND ( kg LIKE '%中央汇金%' OR  kg LIKE '%国有资产监督管理委员会%' OR kg LIKE '%中华人民共和国财政部%')
+            AND ( kg LIKE '%中央汇金%' OR  kg LIKE '%国有资产监督管理委员会%' OR kg LIKE '%国务院%')
 
             ORDER BY super_money DESC LIMIT 18) T order by super_money";
 
