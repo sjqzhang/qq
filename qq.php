@@ -510,6 +510,7 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
             WHERE super_money>small_money AND small_money<0 group by ggzj.stockno ORDER BY super_money  DESC LIMIT 10) t order by super_money
             ";
 
+
         return $this->query($sql);
     }
 
