@@ -454,7 +454,8 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
     function cg(){
 
         //$key="主力实力强大|主力拉抬明显|多头市道|走势形态良好|建议跟进|积极增仓|强势特征明显";
-        $key="主力实力强大|主力拉抬明显|多头市道|强势特征明显";
+        //$key="主力实力强大|主力拉抬明显|多头市道|强势特征明显";
+        $key="主力实力强大|主力拉抬明显|强势特征明显";
         $keys=preg_split('/\|/',$key);
         if(!function_exists('addor')){
             function addor(&$value){
@@ -466,7 +467,12 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
         $like= '( '. join($keys,' OR ').' ) ';
 
         $w=date('w');
-        if($w==1){
+
+        if($w==6){
+            $w=-1;
+        } else if($w==7){
+            $w=-2;
+        }else if($w==1){
             $w=-3;
         } else {
             $w=-1;
@@ -478,7 +484,7 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
                           cgcp.name not like '%st%' and $like  limit 18";
 
 
-        //echo $sql;
+       // echo $sql;
 
             return $this->query($sql);
 
@@ -587,6 +593,12 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
 
     }
 
+    function pp($stockno){
+
+        $sql="select * from (select stockno,name,price,cdate,remark from cgcp where stockno='$stockno' or name like '%$stockno%' order by cdate desc limit 9) t order by cdate";
+
+        return $this->query($sql);
+    }
     function p($stockno){
 
         $sql="select stockno,name,price,cdate,remark from cgcp where stockno='$stockno' or name like '%$stockno%' order by cdate desc limit 1";
@@ -679,6 +691,16 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
 
     }
 
+    function refresh(){
+
+       $dir="/var/www/stock/collector/";
+       $ret=system("/usr/bin/php ".$dir."tencent.php")."\n";
+
+       $ret.=system("/usr/bin/php ".$dir."eastmoney.php");
+
+       return $ret;
+    }
+
 
     function news(){
         $rows=array();
@@ -720,17 +742,62 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
 
 
 
-        phpQuery::newDocumentFileHTML("http://stockpage.10jqka.com.cn/".$stockno."/company/");
+        //phpQuery::newDocumentFileHTML("http://stockpage.10jqka.com.cn/".$stockno."/company/");
 
-        $text=pq('.product_name')->text();
-        $text=$text."\n\n持股\t".pq('.gray')->parent()->text();
-        $text= preg_replace('/\s+/'," ",$text);
-        $text= preg_replace('/\n+/',"\n",$text);
-        $data=array('info'=>$text);
+        //$text=pq('.product_name')->text();
+        //$text=$text."\n\n持股\t".pq('.gray')->parent()->text();
+        //$text= preg_replace('/\s+/'," ",$text);
+        //$text= preg_replace('/\n+/',"\n",$text);
+        //$data=array('info'=>$text);
 
-        return $text;
+        //return $text;
+        //
+        //
+        //
 
 
+        global $db;
+
+
+        $row= $db->query("select * from gudong where stockno='$stockno'");
+
+        if(empty($row)){
+            phpQuery::newDocumentFileHTML("http://www.bestopview.com/gudong/".$stockno.".html");
+            $text=pq('#DataNews')->text();
+        } else {
+            $text= $row[0]['gudong'];
+        }
+
+        preg_match("/\n【1.控股股东与实际控制人】[\S\s]+?【2.股东持股变动】/i",$text,$match);
+
+
+
+       $info=  $this->gg($stockno);
+
+
+        return $info.preg_replace('/\||┌|┐|└┼|┬|─|┴ |┤|┘|└|┬\｜||┼|├|┴|┬ |├/','',$match[0]);
+
+
+    }
+
+
+    function gy(){
+
+        $sql="
+            select * from (
+            SELECT gpxx.stockno,gpxx.name,gpxx.ltsj, gpxx.zdb,ROUND( ggzj.super_money/10000) super_money, ROUND(ggzj.small_money/10000) small_money FROM gpxx
+
+            INNER JOIN gudong ON gpxx.stockno=gudong.stockno
+            INNER JOIN ggzj ON gpxx.stockno=ggzj.stockno AND ggzj.cdate=gpxx.cdate
+
+            WHERE gpxx.cdate=DATE(NOW())
+
+            AND ( kg LIKE '%中央汇金%' OR  kg LIKE '%国有资产监督管理委员会%' OR kg LIKE '%中华人民共和国财政部%')
+
+            ORDER BY super_money DESC LIMIT 18) T order by super_money";
+
+
+        return $this->query($sql);
 
     }
 
