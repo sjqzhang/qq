@@ -82,6 +82,7 @@ class QQ3G {
         curl_setopt($ch,CURLOPT_URL,$url);
         curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);
         curl_setopt($ch,CURLOPT_POST,$is_post);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
         if(!empty($data)){
             curl_setopt($ch,CURLOPT_POSTFIELDS,http_build_query($data));
         }
@@ -373,7 +374,7 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
     function dpzj(){
 
         $sql="
-            select T.*,gpjs.rd from (
+            select T.*,gpjs.rd,gpjs.name from (
 
                 select cdate, ROUND( SUM(main_money/10000/10000),2) main_money, round( sum(super_money/10000/10000),2) super_money, round(SUM(small_money/10000/10000),2) small_money from ggzj  group by cdate order by cdate desc limit 5
 
@@ -484,7 +485,7 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
                           cgcp.name not like '%st%' and $like  limit 18";
 
 
-       // echo $sql;
+        echo $sql;
 
             return $this->query($sql);
 
@@ -507,7 +508,7 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
         $sql="select * from (SELECT ggzl.stockno,ggzl.name,ggzl.price,ggzl.rd1,ggzl.rd5,ggzl.rd10,mr1,ROUND( sum( main_money)/10000) main_money,ROUND(sum( super_money)/10000) super_money,ROUND(sum( small_money)/10000) small_money,ROUND(gpxx.ltsj) ltsj,ROUND(gpxx.zsj) zsj FROM stock.ggzl INNER JOIN stock.ggzj ON
             ggzl.stockno = ggzj.stockno AND ggzl.cdate=ggzj.cdate AND ggzl.cdate>=DATE(date_add(now(),interval -$d day))
             INNER JOIN stock.gpxx ON gpxx.stockno=ggzl.stockno AND gpxx.cdate=ggzl.cdate
-            WHERE super_money>small_money AND small_money<0 group by ggzj.stockno ORDER BY super_money  DESC LIMIT 10) t order by super_money
+            WHERE super_money>small_money AND small_money<0 and ggzj.price<20 group by ggzj.stockno ORDER BY super_money  DESC LIMIT 10) t order by super_money
             ";
 
 
@@ -778,34 +779,67 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
             phpQuery::newDocumentFileHTML("http://www.bestopview.com/gudong/".$stockno.".html");
             $text=pq('#DataNews')->text();
         } else {
-            $text= $row[0]['gudong'];
+            $text= $row[0]['kg'];
         }
+
+        if(strlen($text)>1024){
 
         preg_match("/\n【1.控股股东与实际控制人】[\S\s]+?【2.股东持股变动】/i",$text,$match);
 
 
+        $text=$match[0];
 
-       $info=  $this->gg($stockno);
+        }
 
 
-        return $info.preg_replace('/\||┌|┐|└┼|┬|─|┴ |┤|┘|└|┬\｜||┼|├|┴|┬ |├/','',$match[0]);
+       $info=  $this->gg($stockno).$text;
 
+
+
+        return $info;
 
     }
 
+
+    function gycg(){
+
+        $sql="     SELECT T.*,gudong.kg FROM (
+                    SELECT cgcp.stockno,cgcp.name,cgcp.cdate,cur,rd,ltsj,remark FROM cgcp INNER JOIN gpxx ON cgcp.stockno=gpxx.stockno AND
+                                       gpxx.cdate=DATE(NOW())  WHERE cgcp.cdate= DATE_ADD(DATE(NOW()),INTERVAL -1 DAY) AND cur>0 AND
+                                                                 cgcp.name NOT LIKE '%st%' AND ( remark LIKE '%主力实力强大%' OR remark LIKE '%主力拉抬明显%' OR remark LIKE '%强势特征明显%' )
+
+                          ) T INNER JOIN gudong ON T.stockno=gudong.stockno
+
+                          WHERE  ( kg LIKE '%中央汇金%' OR  kg LIKE '%财政部%' OR kg LIKE '%国务院%')
+            ";
+
+        return $this->query($sql);
+
+    }
+
+    function zd($stockno){
+        $sql="SELECT NAME, stockno,cur,zdb, jt,dt FROM gpxx WHERE stockno='$stockno' AND cdate=DATE(NOW())";
+        return $this->query($sql);
+    }
+
+    function n(){
+
+        $sql="SELECT title FROM news WHERE cdate=DATE(NOW())";
+        return $this->query($sql);
+    }
 
     function gy(){
 
         $sql="
             select * from (
-            SELECT gpxx.stockno,gpxx.name,gpxx.ltsj, gpxx.zdb,ROUND( ggzj.super_money/10000) super_money, ROUND(ggzj.small_money/10000) small_money FROM gpxx
+            SELECT gpxx.stockno,gpxx.name,gpxx.cur, gpxx.zdb,gpxx.ltsj,ROUND( ggzj.super_money/10000) super_money, ROUND(ggzj.small_money/10000) small_money FROM gpxx
 
             INNER JOIN gudong ON gpxx.stockno=gudong.stockno
             INNER JOIN ggzj ON gpxx.stockno=ggzj.stockno AND ggzj.cdate=gpxx.cdate
 
             WHERE gpxx.cdate=DATE(NOW())
 
-            AND ( kg LIKE '%中央汇金%' OR  kg LIKE '%国有资产监督管理委员会%' OR kg LIKE '%国务院%')
+            AND ( kg LIKE '%中央汇金%' OR  kg LIKE '%财政部%' OR kg LIKE '%国务院%')
 
             ORDER BY super_money DESC LIMIT 18) T order by super_money";
 
@@ -814,6 +848,13 @@ case when stype=1 then concat('http://image.sinajs.cn/newchart/daily/n/sh',gpxx.
 
     }
 
+
+    function bl($name){
+
+        $sql="select pkname,pkcode from easymoney_pk_type where pkname like '%$name%' or pkcode like '%$name%' group by pkcode limit 30";
+
+        return $this->query($sql);
+    }
 
     function dispatch($num,$message,$sender){
         $func='gg';
